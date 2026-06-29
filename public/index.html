@@ -78,6 +78,7 @@
   .dupe-badge { font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; }
   .badge-transfer { background:#fef9c3; color:#78350f; }
   .badge-source   { background:#dbeafe; color:#1e40af; }
+  .badge-ci-diff  { background:#fee2e2; color:#991b1b; }
   .dupe-body { padding:0; }
   .dupe-row  { display:grid; grid-template-columns:220px 1fr; gap:8px; padding:7px 12px; border-top:1px solid var(--border); font-size:12px; }
   .dupe-hosp { color:var(--muted); font-size:11px; }
@@ -307,23 +308,27 @@ function buildSidebar(byHosp) {
 function buildDupes(dupes) {
   const container = document.getElementById('dupes-container');
 
-  // Hospitals known to share the same patient lists (same API source, different entry)
-  const SAME_SOURCE_PAIRS = [
-    new Set(['Hospital Dr. José Gregorio Hernández','Hospital General del Oeste']),
-  ];
-
-  function isSameSource(hosps) {
-    return SAME_SOURCE_PAIRS.some(pair => hosps.every(h => pair.has(h)));
-  }
+  const CONFIG = {
+    traslado: {
+      label: 'posible traslado',
+      cls:   'badge-transfer',
+      note:  '⚠️ Misma cédula registrada en distintos centros. Puede haberse trasladado entre hospitales. Se conserva en los dos.',
+    },
+    encoding: {
+      label: 'mismo registro / encoding diferente',
+      cls:   'badge-source',
+      note:  '⚠️ Mismo paciente registrado dos veces por error de encoding en una fuente.',
+    },
+    ci_diferente: {
+      label: 'misma CI / nombre diferente',
+      cls:   'badge-ci-diff',
+      note:  '⚠️ Misma cédula pero nombres distintos. Puede ser un error de ingreso en la cédula. Requiere verificación manual.',
+    },
+  };
 
   container.innerHTML = dupes.map(d => {
-    const hosps = [...new Set(d.entries.map(e => e.hospital))];
-    const sameSource = isSameSource(hosps);
-    const label = sameSource ? 'mismo registro / encoding diferente' : 'posible traslado';
-    const cls   = sameSource ? 'badge-source' : 'badge-transfer';
-    const note  = sameSource
-      ? '⚠️ Mismo paciente registrado dos veces por error de encoding en una fuente.'
-      : '⚠️ Puede haberse registrado en ambos centros por traslado entre hospitales. Se conserva en los dos.';
+    const tipo = d.tipo || 'traslado';
+    const { label, cls, note } = CONFIG[tipo] || CONFIG.traslado;
     return `
       <div class="dupe-card">
         <div class="dupe-header">
