@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reporte de Pacientes — Sismo La Guaira 2026</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #f8f9fa; --surface: #ffffff; --border: #e5e7eb;
+    --text: #111827; --muted: #6b7280; --accent: #2563eb;
+    --green: #16a34a; --red: #dc2626; --amber: #d97706;
+    --shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+  }
+  body { background: var(--bg); color: var(--text); font-family: system-ui,-apple-system,sans-serif; font-size: 14px; min-height: 100vh; }
+
+  /* HEADER */
+  .header { background: var(--accent); color: #fff; padding: 20px 24px; }
+  .header h1 { font-size: 20px; font-weight: 700; }
+  .header p  { font-size: 12px; opacity: .8; margin-top: 3px; }
+  .header-meta { display:flex; gap:16px; margin-top:12px; flex-wrap:wrap; }
+  .header-stat { background: rgba(255,255,255,.15); border-radius:8px; padding:8px 14px; }
+  .header-stat .val { font-size:22px; font-weight:700; }
+  .header-stat .lbl { font-size:11px; opacity:.8; }
+
+  /* LAYOUT */
+  .layout { display: grid; grid-template-columns: 260px 1fr; gap: 0; height: calc(100vh - 96px); }
+  .sidebar { background: var(--surface); border-right: 1px solid var(--border); padding: 16px; overflow-y: auto; }
+  .main { overflow: hidden; display: flex; flex-direction: column; }
+
+  /* TABS */
+  .tabs { display:flex; gap:0; border-bottom:1px solid var(--border); background:var(--surface); padding:0 16px; }
+  .tab { padding:10px 16px; font-size:12px; font-weight:600; cursor:pointer; border-bottom:2px solid transparent; color:var(--muted); white-space:nowrap; }
+  .tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+  .tab .badge { background:var(--red); color:#fff; border-radius:10px; font-size:10px; padding:1px 6px; margin-left:4px; }
+  .tab .badge.amber { background:var(--amber); }
+
+  /* PANELS */
+  .panel { display:none; flex:1; overflow:hidden; flex-direction:column; }
+  .panel.active { display:flex; }
+
+  /* SEARCH + FILTERS */
+  .toolbar { padding:12px 16px; background:var(--surface); border-bottom:1px solid var(--border); display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .search { flex:1; min-width:200px; padding:7px 10px 7px 32px; border:1px solid var(--border); border-radius:6px; font-size:13px; background:var(--bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%236b7280' viewBox='0 0 24 24'%3E%3Cpath d='M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z' stroke='%236b7280' stroke-width='2' fill='none'/%3E%3C/svg%3E") no-repeat 8px center; }
+  select { padding:7px 10px; border:1px solid var(--border); border-radius:6px; font-size:12px; background:var(--bg); color:var(--text); }
+  .count-label { font-size:12px; color:var(--muted); }
+
+  /* TABLE */
+  .table-wrap { flex:1; overflow:auto; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  thead th { background:var(--bg); padding:8px 10px; text-align:left; font-weight:600; font-size:11px; color:var(--muted); position:sticky; top:0; border-bottom:1px solid var(--border); white-space:nowrap; }
+  tbody td { padding:7px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
+  tbody tr:hover td { background:#f0f7ff; }
+  .hosp-chip { display:inline-block; background:var(--bg); border:1px solid var(--border); border-radius:4px; padding:1px 5px; font-size:10px; color:var(--muted); }
+  .ci { font-family:monospace; font-size:11px; }
+  .fuente-chip { display:inline-block; border-radius:4px; padding:1px 6px; font-size:10px; font-weight:600; }
+  .src-xlsx    { background:#dbeafe; color:#1e40af; }
+  .src-api     { background:#d1fae5; color:#065f46; }
+  .src-sheets  { background:#fef9c3; color:#78350f; }
+  .src-pdf     { background:#fce7f3; color:#9d174d; }
+  .src-imagen  { background:#ede9fe; color:#5b21b6; }
+
+  /* SIDEBAR */
+  .sidebar h3 { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin:12px 0 6px; }
+  .sidebar h3:first-child { margin-top:0; }
+  .hosp-bar { margin-bottom:5px; cursor:pointer; }
+  .hosp-bar .name { font-size:12px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .hosp-bar .track { background:var(--bg); border-radius:4px; height:6px; margin-top:3px; overflow:hidden; }
+  .hosp-bar .fill  { background:var(--accent); height:100%; border-radius:4px; transition:width .3s; }
+  .hosp-bar .num   { font-size:11px; color:var(--muted); }
+  .hosp-bar.selected .name { color:var(--accent); font-weight:700; }
+
+  /* DUPES PANEL */
+  .dupes-wrap { flex:1; overflow:auto; padding:16px; }
+  .dupe-card { border:1px solid var(--border); border-radius:8px; margin-bottom:10px; overflow:hidden; }
+  .dupe-header { padding:8px 12px; background:var(--bg); display:flex; align-items:center; gap:10px; }
+  .dupe-ci { font-family:monospace; font-weight:700; color:var(--accent); font-size:13px; }
+  .dupe-badge { font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; }
+  .badge-transfer { background:#fef9c3; color:#78350f; }
+  .badge-source   { background:#dbeafe; color:#1e40af; }
+  .dupe-body { padding:0; }
+  .dupe-row  { display:grid; grid-template-columns:220px 1fr; gap:8px; padding:7px 12px; border-top:1px solid var(--border); font-size:12px; }
+  .dupe-hosp { color:var(--muted); font-size:11px; }
+  .dupe-note { font-size:11px; color:var(--muted); padding:6px 12px; background:#fffbeb; border-top:1px solid #fde68a; }
+
+  /* STATS PANEL */
+  .stats-wrap { flex:1; overflow:auto; padding:20px; display:flex; flex-direction:column; gap:20px; }
+  .stats-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:12px; }
+  .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px; box-shadow:var(--shadow); }
+  .stat-card .val { font-size:28px; font-weight:700; }
+  .stat-card .lbl { font-size:12px; color:var(--muted); margin-top:4px; }
+  .progress-bar { background:var(--bg); border-radius:6px; height:8px; overflow:hidden; margin-top:8px; }
+  .progress-fill { height:100%; border-radius:6px; }
+
+  /* PAGINATION */
+  .pagination { display:flex; align-items:center; gap:8px; padding:8px 16px; background:var(--surface); border-top:1px solid var(--border); font-size:12px; color:var(--muted); }
+  .pg-btn { padding:4px 10px; border:1px solid var(--border); border-radius:5px; cursor:pointer; background:var(--surface); font-size:12px; }
+  .pg-btn:disabled { opacity:.4; cursor:default; }
+  .pg-btn:not(:disabled):hover { background:var(--bg); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>📋 Control de Pacientes — Sismo La Guaira 2026</h1>
+  <p>Fuentes: Google Sheets · XLSX · API 911 · PDF · Imágenes · Actualizado 28/06/2026</p>
+  <div class="header-meta">
+    <div class="header-stat"><div class="val" id="h-total">—</div><div class="lbl">pacientes únicos</div></div>
+    <div class="header-stat"><div class="val" id="h-hospitales">14</div><div class="lbl">hospitales</div></div>
+    <div class="header-stat"><div class="val" id="h-cedula">—</div><div class="lbl">con cédula</div></div>
+    <div class="header-stat"><div class="val" id="h-dupes">33</div><div class="lbl">duplicados cruzados</div></div>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <h3>Hospitales</h3>
+    <div class="hosp-bar" data-hosp="" onclick="filterHosp(this)">
+      <div style="display:flex;justify-content:space-between"><span class="name">Todos</span><span class="num" id="sb-all">—</span></div>
+    </div>
+    <div id="sidebar-hosps"></div>
+
+    <h3 style="margin-top:20px">Fuentes</h3>
+    <div id="sidebar-fuentes"></div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('pacientes')">Pacientes</div>
+      <div class="tab" onclick="showTab('dupes')">Duplicados cruzados <span class="badge amber">33</span></div>
+      <div class="tab" onclick="showTab('stats')">Estadísticas</div>
+    </div>
+
+    <!-- PACIENTES -->
+    <div id="tab-pacientes" class="panel active">
+      <div class="toolbar">
+        <input class="search" id="search" placeholder="Buscar por nombre, apellido o cédula..." oninput="applyFilters()">
+        <select id="filter-fuente" onchange="applyFilters()">
+          <option value="">Todas las fuentes</option>
+          <option value="xlsx">XLSX</option>
+          <option value="api">API 911</option>
+          <option value="sheets">Google Sheets</option>
+          <option value="pdf">PDF</option>
+          <option value="imagen">Imágenes</option>
+        </select>
+        <span class="count-label" id="result-count"></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Nombres</th>
+              <th>Apellidos</th>
+              <th>Cédula</th>
+              <th>Edad</th>
+              <th>Hospital</th>
+              <th>Área</th>
+              <th>Procedencia</th>
+              <th>Fuente</th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <button class="pg-btn" id="pg-prev" onclick="changePage(-1)">← Anterior</button>
+        <span id="pg-info"></span>
+        <button class="pg-btn" id="pg-next" onclick="changePage(1)">Siguiente →</button>
+      </div>
+    </div>
+
+    <!-- DUPLICADOS -->
+    <div id="tab-dupes" class="panel">
+      <div class="toolbar">
+        <span style="font-size:12px;color:var(--muted)">
+          Pacientes con la misma cédula en más de un hospital. Puede indicar traslado entre centros o registro duplicado en diferentes fuentes.
+        </span>
+      </div>
+      <div class="dupes-wrap" id="dupes-container"></div>
+    </div>
+
+    <!-- STATS -->
+    <div id="tab-stats" class="panel">
+      <div class="stats-wrap" id="stats-container"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let allData = [];
+let filtered = [];
+let page = 0;
+const PAGE_SIZE = 100;
+let activeHosp = '';
+
+fetch('data.json')
+  .then(r => r.json())
+  .then(data => {
+    allData = data.records;
+    filtered = allData;
+
+    document.getElementById('h-total').textContent = data.total.toLocaleString('es');
+    document.getElementById('h-cedula').textContent = data.con_cedula.toLocaleString('es');
+
+    buildSidebar(data.by_hospital);
+    buildDupes(data.cross_dupes);
+    buildStats(data);
+    renderTable();
+  });
+
+function srcClass(fuente) {
+  const f = fuente.toLowerCase();
+  if (f.includes('xlsx') || f.includes('excel')) return 'src-xlsx';
+  if (f.includes('api'))    return 'src-api';
+  if (f.includes('sheets') || f.includes('google')) return 'src-sheets';
+  if (f.includes('pdf'))    return 'src-pdf';
+  if (f.includes('imagen') || f.includes('img') || f.includes('wa')) return 'src-imagen';
+  return '';
+}
+
+function srcLabel(fuente) {
+  const f = fuente.toLowerCase();
+  if (f.includes('xlsx') || f.includes('excel')) return 'XLSX';
+  if (f.includes('api'))    return 'API';
+  if (f.includes('sheets') || f.includes('google')) return 'Sheets';
+  if (f.includes('pdf'))    return 'PDF';
+  if (f.includes('imagen') || f.includes('img') || f.includes('wa')) return 'Imagen';
+  return fuente.substring(0,10);
+}
+
+function renderTable() {
+  const start = page * PAGE_SIZE;
+  const slice = filtered.slice(start, start + PAGE_SIZE);
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = slice.map(r => `
+    <tr>
+      <td>${r.nombres || '<span style="color:var(--muted)">—</span>'}</td>
+      <td>${r.apellidos || '<span style="color:var(--muted)">—</span>'}</td>
+      <td class="ci">${r.cedula || '<span style="color:var(--muted)">—</span>'}</td>
+      <td>${r.edad || '—'}</td>
+      <td><span class="hosp-chip">${r.hospital.replace('Hospital ','')}</span></td>
+      <td style="font-size:11px;color:var(--muted)">${r.area || '—'}</td>
+      <td style="font-size:11px">${r.procedencia || '—'}</td>
+      <td><span class="fuente-chip ${srcClass(r.fuente)}">${srcLabel(r.fuente)}</span></td>
+    </tr>
+  `).join('');
+
+  const total = filtered.length;
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  document.getElementById('pg-info').textContent = `${start+1}–${Math.min(start+PAGE_SIZE,total)} de ${total.toLocaleString('es')}`;
+  document.getElementById('pg-prev').disabled = page === 0;
+  document.getElementById('pg-next').disabled = page >= totalPages - 1;
+  document.getElementById('result-count').textContent = `${total.toLocaleString('es')} registros`;
+}
+
+function applyFilters() {
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const fuente = document.getElementById('filter-fuente').value.toLowerCase();
+
+  filtered = allData.filter(r => {
+    const hospMatch = !activeHosp || r.hospital === activeHosp;
+    const fuenteMatch = !fuente || r.fuente.toLowerCase().includes(fuente);
+    const qMatch = !q || [r.nombres, r.apellidos, r.cedula].join(' ').toLowerCase().includes(q);
+    return hospMatch && fuenteMatch && qMatch;
+  });
+  page = 0;
+  renderTable();
+}
+
+function filterHosp(el) {
+  document.querySelectorAll('.hosp-bar').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  activeHosp = el.dataset.hosp;
+  applyFilters();
+}
+
+function changePage(dir) {
+  page += dir;
+  renderTable();
+  document.querySelector('.main').scrollTop = 0;
+}
+
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  event.target.closest('.tab').classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+function buildSidebar(byHosp) {
+  const max = Math.max(...Object.values(byHosp));
+  document.getElementById('sb-all').textContent = Object.values(byHosp).reduce((a,b)=>a+b,0).toLocaleString('es');
+  const el = document.getElementById('sidebar-hosps');
+  el.innerHTML = Object.entries(byHosp).map(([h, n]) => `
+    <div class="hosp-bar" data-hosp="${h}" onclick="filterHosp(this)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span class="name">${h.replace('Hospital ','')}</span>
+        <span class="num">${n.toLocaleString('es')}</span>
+      </div>
+      <div class="track"><div class="fill" style="width:${(n/max*100).toFixed(1)}%"></div></div>
+    </div>
+  `).join('');
+}
+
+function buildDupes(dupes) {
+  const container = document.getElementById('dupes-container');
+
+  // Hospitals known to share the same patient lists (same API source, different entry)
+  const SAME_SOURCE_PAIRS = [
+    new Set(['Hospital Dr. José Gregorio Hernández','Hospital General del Oeste']),
+  ];
+
+  function isSameSource(hosps) {
+    return SAME_SOURCE_PAIRS.some(pair => hosps.every(h => pair.has(h)));
+  }
+
+  container.innerHTML = dupes.map(d => {
+    const hosps = [...new Set(d.entries.map(e => e.hospital))];
+    const sameSource = isSameSource(hosps);
+    const label = sameSource ? 'mismo registro / encoding diferente' : 'posible traslado';
+    const cls   = sameSource ? 'badge-source' : 'badge-transfer';
+    const note  = sameSource
+      ? '⚠️ Mismo paciente registrado dos veces por error de encoding en una fuente.'
+      : '⚠️ Puede haberse registrado en ambos centros por traslado entre hospitales. Se conserva en los dos.';
+    return `
+      <div class="dupe-card">
+        <div class="dupe-header">
+          <span class="dupe-ci">CI ${d.ci}</span>
+          <span class="dupe-badge ${cls}">${label}</span>
+        </div>
+        <div class="dupe-body">
+          ${d.entries.map(e => `
+            <div class="dupe-row">
+              <span class="dupe-hosp">${e.hospital}</span>
+              <span>${e.nombre}</span>
+            </div>
+          `).join('')}
+        </div>
+        <div class="dupe-note">${note}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function buildStats(data) {
+  const container = document.getElementById('stats-container');
+  const total = data.total;
+
+  const hospRows = Object.entries(data.by_hospital).map(([h,n]) => `
+    <tr>
+      <td style="padding:6px 10px;font-size:12px">${h}</td>
+      <td style="padding:6px 10px;font-size:12px;font-weight:600">${n.toLocaleString('es')}</td>
+      <td style="padding:6px 10px;width:120px">
+        <div class="progress-bar">
+          <div class="progress-fill" style="width:${(n/total*100).toFixed(1)}%;background:var(--accent)"></div>
+        </div>
+      </td>
+      <td style="padding:6px 10px;font-size:11px;color:var(--muted)">${(n/total*100).toFixed(1)}%</td>
+    </tr>
+  `).join('');
+
+  container.innerHTML = `
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="val" style="color:var(--accent)">${total.toLocaleString('es')}</div>
+        <div class="lbl">Pacientes únicos totales</div>
+      </div>
+      <div class="stat-card">
+        <div class="val" style="color:var(--green)">${data.con_cedula.toLocaleString('es')}</div>
+        <div class="lbl">Con cédula registrada</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${(data.con_cedula/total*100).toFixed(1)}%;background:var(--green)"></div></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">${(data.con_cedula/total*100).toFixed(1)}%</div>
+      </div>
+      <div class="stat-card">
+        <div class="val" style="color:var(--amber)">${data.sin_cedula.toLocaleString('es')}</div>
+        <div class="lbl">Sin cédula registrada</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${(data.sin_cedula/total*100).toFixed(1)}%;background:var(--amber)"></div></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">${(data.sin_cedula/total*100).toFixed(1)}%</div>
+      </div>
+      <div class="stat-card">
+        <div class="val" style="color:var(--green)">${data.con_edad.toLocaleString('es')}</div>
+        <div class="lbl">Con edad registrada</div>
+        <div class="progress-bar"><div class="progress-fill" style="width:${(data.con_edad/total*100).toFixed(1)}%;background:var(--green)"></div></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">${(data.con_edad/total*100).toFixed(1)}%</div>
+      </div>
+      <div class="stat-card">
+        <div class="val">14</div>
+        <div class="lbl">Hospitales / centros</div>
+      </div>
+      <div class="stat-card">
+        <div class="val" style="color:var(--red)">33</div>
+        <div class="lbl">Duplicados cruzados detectados</div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+      <div style="padding:12px 16px;font-size:13px;font-weight:700;border-bottom:1px solid var(--border)">Distribución por hospital</div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr>
+              <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--muted);background:var(--bg)">Hospital</th>
+              <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--muted);background:var(--bg)">Pacientes</th>
+              <th style="padding:8px 10px;background:var(--bg);width:120px"></th>
+              <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--muted);background:var(--bg)">%</th>
+            </tr>
+          </thead>
+          <tbody style="font-size:12px">${hospRows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+</script>
+</body>
+</html>
